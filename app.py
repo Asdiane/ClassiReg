@@ -1,5 +1,3 @@
-# app.py
-
 import streamlit as st
 from components.file_uploader import file_uploader_component
 from pages.data_exploration import data_exploration_page
