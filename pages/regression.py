@@ -1,10 +1,12 @@
 import streamlit as st
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
+import joblib
+import io
 
 def regression_page():
     if 'data' in st.session_state:
@@ -20,49 +22,86 @@ def regression_page():
         # Sélection de l'algorithme
         st.write("### Sélectionner un algorithme de Régression")
         algorithm = st.selectbox("Choisissez un algorithme", 
-                                 ("Régression Linéaire", "Régression Polynomiale", "Forêt Aléatoire"))
+                                 ("Régression Linéaire", "Régression Polynomiale", "Forêt Aléatoire", "Ridge", "Lasso", "ElasticNet"))
 
-        if st.button("Entraîner le modèle"):
-            X = data[feature_columns]
-            y = data[target_column]
+        # Option pour charger un modèle existant
+        load_model = st.checkbox("Charger un modèle existant")
 
-            # Diviser les données en ensembles d'entraînement et de test
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        model = None
+        if load_model:
+            model_file = st.file_uploader("Téléchargez le fichier du modèle", type=["pkl"])
+            if model_file is not None:
+                model = joblib.load(model_file)
+                st.success("Modèle chargé avec succès.")
 
-            # Initialiser le modèle
-            if algorithm == "Régression Linéaire":
-                model = LinearRegression()
-            elif algorithm == "Régression Polynomiale":
-                poly = PolynomialFeatures(degree=2)
-                X_train_poly = poly.fit_transform(X_train)
-                X_test_poly = poly.transform(X_test)
-                model = LinearRegression()
-                model.fit(X_train_poly, y_train)
-                y_pred = model.predict(X_test_poly)
-            elif algorithm == "Forêt Aléatoire":
-                model = RandomForestRegressor()
+        if not load_model or model is None:
+            if st.button("Entraîner le modèle"):
+                X = data[feature_columns]
+                y = data[target_column]
 
-            # Entraîner le modèle
-            if algorithm != "Régression Polynomiale":
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
+                # Diviser les données en ensembles d'entraînement et de test
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-            # Évaluer le modèle
-            mse = mean_squared_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
+                # Initialiser le modèle
+                if algorithm == "Régression Linéaire":
+                    model = LinearRegression()
+                elif algorithm == "Régression Polynomiale":
+                    poly = PolynomialFeatures(degree=2)
+                    X_train_poly = poly.fit_transform(X_train)
+                    X_test_poly = poly.transform(X_test)
+                    model = LinearRegression()
+                    model.fit(X_train_poly, y_train)
+                    y_pred = model.predict(X_test_poly)
+                elif algorithm == "Forêt Aléatoire":
+                    model = RandomForestRegressor()
+                    model.fit(X_train, y_train)
+                    y_pred = model.predict(X_test)
+                elif algorithm == "Ridge":
+                    model = Ridge()
+                elif algorithm == "Lasso":
+                    model = Lasso()
+                elif algorithm == "ElasticNet":
+                    model = ElasticNet()
 
-            st.write("### Résultats de la Régression")
-            st.write(f"Mean Squared Error (MSE): {mse:.2f}")
-            st.write(f"R² Score: {r2:.2f}")
+                if algorithm not in ["Régression Polynomiale", "Ridge", "Lasso", "ElasticNet"]:
+                    model.fit(X_train, y_train)
+                    y_pred = model.predict(X_test)
+                elif algorithm in ["Ridge", "Lasso", "ElasticNet"]:
+                    model.fit(X_train, y_train)
+                    y_pred = model.predict(X_test)
 
-            # Visualisation des résultats
-            st.write("### Visualisation des Résultats")
-            fig, ax = plt.subplots()
-            ax.scatter(y_test, y_pred)
-            ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
-            ax.set_xlabel('Valeurs Réelles')
-            ax.set_ylabel('Prédictions')
-            st.pyplot(fig)
+                # Évaluer le modèle
+                mse = mean_squared_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
 
+                st.write("### Résultats de la Régression")
+                st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                st.write(f"R² Score: {r2:.2f}")
+
+                # Visualisation des résultats
+                st.write("### Visualisation des Résultats")
+                fig, ax = plt.subplots()
+                ax.scatter(y_test, y_pred)
+                ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
+                ax.set_xlabel('Valeurs Réelles')
+                ax.set_ylabel('Prédictions')
+                st.pyplot(fig)
+
+                # Sauvegarder le modèle en mémoire pour le téléchargement
+                model_filename = st.text_input("Nom du fichier pour sauvegarder le modèle", "model.pkl")
+                if model_filename:  # Vérifiez que le nom du fichier est renseigné
+                    buffer = io.BytesIO()
+                    joblib.dump(model, buffer)
+                    buffer.seek(0)  # Revenir au début du buffer
+
+                    # Utiliser st.download_button pour permettre le téléchargement
+                    st.download_button(
+                        label="Télécharger le modèle",
+                        data=buffer,
+                        file_name=model_filename,
+                        mime='application/octet-stream'
+                    )
+                else:
+                    st.error("Veuillez entrer un nom de fichier valide pour télécharger le modèle.")
     else:
         st.warning("Veuillez d'abord télécharger un fichier pour commencer la régression.")
