@@ -7,13 +7,19 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 import matplotlib.pyplot as plt
+import joblib
+import io
+from pages.data_exploration import make_dataframe_arrow_compatible
+
 
 
 def classification_page():
     if 'data' in st.session_state:
         data = st.session_state['data']
+        data = make_dataframe_arrow_compatible(data)  # Convertir pour compatibilité Arrow
 
         st.write("### Sélectionner les colonnes pour la Classification")
         all_columns = data.columns.tolist()
@@ -27,40 +33,73 @@ def classification_page():
         algorithm = st.selectbox("Choisissez un algorithme", 
                                  ("Régression Logistique", "Arbre de Décision", "Forêt Aléatoire", "SVM", "KNN"))
 
-        if st.button("Entraîner le modèle"):
-            X = data[feature_columns]
-            y = data[target_column]
+        # Option pour charger un modèle existant
+        load_model = st.checkbox("Charger un modèle existant")
 
-            # Diviser les données en ensembles d'entraînement et de test
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        model = None
+        if load_model:
+            model_file = st.file_uploader("Téléchargez le fichier du modèle", type=["pkl"])
+            if model_file is not None:
+                model = joblib.load(model_file)
+                st.success("Modèle chargé avec succès.")
 
-            # Initialiser le modèle
-            if algorithm == "Régression Logistique":
-                model = LogisticRegression()
-            elif algorithm == "Arbre de Décision":
-                model = DecisionTreeClassifier()
-            elif algorithm == "Forêt Aléatoire":
-                model = RandomForestClassifier()
-            elif algorithm == "SVM":
-                model = SVC()
-            elif algorithm == "KNN":
-                model = KNeighborsClassifier()
+        if not load_model or model is None:
+            if st.button("Entraîner le modèle"):
+                X = data[feature_columns]
+                y = data[target_column]
 
-            # Entraîner le modèle
-            model.fit(X_train, y_train)
+                # Diviser les données en ensembles d'entraînement et de test
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-            # Prédire et évaluer
-            y_pred = model.predict(X_test)
-            report = classification_report(y_test, y_pred, output_dict=True)
-            cm = confusion_matrix(y_test, y_pred)
+                # Normaliser les données
+                scaler = StandardScaler()
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
 
-            st.write("### Rapport de Classification")
-            st.write(pd.DataFrame(report).transpose())
+                # Initialiser le modèle
+                if algorithm == "Régression Logistique":
+                    model = LogisticRegression(max_iter=2000)  # Augmenter max_iter pour améliorer la convergence
+                elif algorithm == "Arbre de Décision":
+                    model = DecisionTreeClassifier()
+                elif algorithm == "Forêt Aléatoire":
+                    model = RandomForestClassifier()
+                elif algorithm == "SVM":
+                    model = SVC()
+                elif algorithm == "KNN":
+                    model = KNeighborsClassifier()
 
-            st.write("### Matrice de Confusion")
-            fig, ax = plt.subplots()
-            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
-            st.pyplot(fig)
+                # Entraîner le modèle
+                model.fit(X_train, y_train)
+
+                # Prédire et évaluer
+                y_pred = model.predict(X_test)
+                report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+                cm = confusion_matrix(y_test, y_pred)
+
+                st.write("### Rapport de Classification")
+                st.write(pd.DataFrame(report).transpose())
+
+                st.write("### Matrice de Confusion")
+                fig, ax = plt.subplots()
+                sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+                st.pyplot(fig)
+
+                # Sauvegarder le modèle en mémoire pour le téléchargement
+                model_filename = st.text_input("Nom du fichier pour sauvegarder le modèle", "model.pkl")
+                if model_filename:  # Assurez-vous que le nom du fichier est renseigné
+                    buffer = io.BytesIO()
+                    joblib.dump(model, buffer)
+                    buffer.seek(0)  # Revenir au début du buffer
+
+                    # Utiliser st.download_button pour permettre le téléchargement
+                    st.download_button(
+                        label="Télécharger le modèle",
+                        data=buffer,
+                        file_name=model_filename,
+                        mime='application/octet-stream'
+                    )
+                else:
+                    st.error("Veuillez entrer un nom de fichier valide pour télécharger le modèle.")
 
     else:
         st.warning("Veuillez d'abord télécharger un fichier pour commencer la classification.")
