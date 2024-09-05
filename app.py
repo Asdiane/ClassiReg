@@ -2,20 +2,31 @@ import streamlit as st
 from components.file_uploader import file_uploader_component
 from pages.data_exploration import data_exploration_page
 from pages.classification import classification_page
+from pages.regression import regression_page
 
 # Titre de l'application
-st.set_page_config(page_title="ClassiReg", layout="wide")
-st.title('ClassiReg - Classification et Régression des Datasets')
+st.title("ClassiReg - Application de Classification et de Régression")
+st.write("""
+Bienvenue dans l'application ClassiReg. Cette application vous permet de télécharger vos datasets, de les explorer,
+d'entraîner des modèles de régression et de classification, et de faire des prédictions en temps réel.
 
-# Menu de navigation
+### Instructions
+1. **Téléchargement des Données** : Commencez par télécharger un fichier CSV contenant vos données.
+2. **Exploration des Données** : Utilisez les outils d'exploration pour comprendre les caractéristiques de votre dataset.
+3. **Entraînement des Modèles** : Sélectionnez les modèles de régression ou de classification que vous souhaitez entraîner.
+4. **Prédictions en Temps Réel** : Ajustez les paramètres d'entrée pour voir comment le modèle prédit les résultats.
+
+Veuillez naviguer entre les onglets pour accéder aux différentes fonctionnalités.
+""")
+# Navigation entre les pages
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Aller à", ["Accueil", "Exploration des Données", "Classification"])
+page = st.sidebar.radio("Aller à", ("Téléchargement des Données", "Exploration des Données", "Régression", "Classification"))
 
-# Logique de navigation
-if page == "Accueil":
-    st.write("Bienvenue sur ClassiReg ! Utilisez le menu de gauche pour naviguer.")
+if page == "Téléchargement des Données":
+    file_uploader_component()
 elif page == "Exploration des Données":
-    file_uploader_component()  # Composant de téléchargement de fichier
-    data_exploration_page()    # Page d'exploration des données
+    data_exploration_page()
+elif page == "Régression":
+    regression_page()
 elif page == "Classification":
-    classification_page()      # Page de la classification
+    classification_page()
