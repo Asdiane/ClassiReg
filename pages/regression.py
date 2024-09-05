@@ -12,6 +12,7 @@ import joblib
 import io
 import pandas as pd
 
+
 def regression_page():
     if 'data' in st.session_state:
         data = st.session_state['data']
